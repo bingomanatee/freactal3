@@ -66,6 +66,29 @@ export default (bottle) => {
     return out;
   });
 
+  /**
+   * converts a POJO into an official JavaScript map.
+   */
+  bottle.factory('asMap', () => (item) => {
+    if (!item) return new Map();
+    if (item instanceof Map) return item;
+    if (typeof item === 'object') {
+      return Object.keys(item).reduce((map, key) => {
+        const value = item[key];
+        map.set(key, value);
+        return map;
+      }, new Map());
+    } else {
+      console.log('asMap cannot process ', item);
+      return new Map();
+    }
+  });
+
+  bottle.factory('asValue', ({ NOT_SET }) => (value, defaultValue = null) => {
+    if ((!value) || (value === NOT_SET)) return defaultValue;
+    return value;
+  });
+
   bottle.constant('NOOP', a => a);
 
   bottle.factory('isPromise', () => (subject) => {

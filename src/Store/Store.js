@@ -16,6 +16,7 @@ export default (bottle) => {
     ChangePromise,
     isPromise,
     capFirst,
+    asValue,
   }) => {
     /**
      * a Store is a record of a state that updates over time.
@@ -63,18 +64,36 @@ export default (bottle) => {
         this.errorStream = new BehaviorSubject(false);
 
         try {
-          this.addActions(actions);
           if (debug) {
             this.debugStream = new BehaviorSubject({
               source: 'constructor',
               config,
             });
           }
-          this._state = state;
-          this._starter = starter;
-          this._status = starter !== NOT_SET ? S_NEW : S_STARTED;
         } catch (err) {
-          this.onError(err);
+          console.log('error setting up debug: ', err);
+        }
+
+        try {
+          this.addActions(actions);
+        } catch (err) {
+          console.log('error setting up actions', err);
+        }
+        try {
+          this._state = state;
+        } catch (err) {
+          console.log('error setting state', err);
+        }
+        try {
+          this._starter = asValue(starter);
+        } catch (err) {
+          console.log('error setting _starter:', err);
+        }
+
+        try {
+          this._status = asValue(this._starter) ? S_NEW : S_STARTED;
+        } catch (err) {
+          console.log('error setting _status');
         }
 
         this.stream = new BehaviorSubject({
@@ -86,19 +105,12 @@ export default (bottle) => {
       /* ----------------- PROPERTIES --------------------- */
 
       get actions() {
-        return this._do;
-      }
-
-      set actions(actions) {
-        this._do = actions;
+        if (!this._actions) this._actions = {};
+        return this._actions;
       }
 
       get do() {
-        return this._do;
-      }
-
-      set do(actions) {
-        this._do = actions;
+        return this._actions;
       }
 
       get status() {
@@ -115,6 +127,22 @@ export default (bottle) => {
           throw new Error('bad value set for _status');
         }
         this.__status = value;
+      }
+
+      get _starter() {
+        return this.__starter || null;
+      }
+
+      set _starter(value) {
+        if (!value) {
+          this.__starter = null;
+          return;
+        }
+        if (!(typeof value === 'function')) {
+          console.log('attempt to set bad value to starter:', value);
+          this.__starter = null;
+        }
+        this.__starter = value;
       }
 
       /**
@@ -235,7 +263,7 @@ export default (bottle) => {
        */
 
       addActions(actionsMap = {}) {
-        const actions = this.actions || {};
+        const actions = this._actions || {};
 
         if (actionsMap && typeof actionsMap === 'object') {
           Object.keys(actionsMap).forEach((name) => {
@@ -250,11 +278,12 @@ export default (bottle) => {
           });
         }
 
-        this.actions = actions;
+        this._actions = actions;
       }
 
       addAction(name, method) {
-        this.actions[name] = this.makeAction(name, method);
+        if (!this._actions) this._actions = {};
+        this._actions[name] = this.makeAction(name, method);
         return this;
       }
 
@@ -469,13 +498,13 @@ export default (bottle) => {
         return this.after('InitError', info);
       }
 
-      after(what, info = 'tried to change') {
-        if (typeof info === 'string') {
-          return this.after(what, new Error(info));
+      after(what, error = 'tried to change') {
+        if (typeof error === 'string') {
+          return this.after(what, new Error(error));
         }
         if (!what) what = this._status.toString();
-        this.errorStream.next({ source: `after${what}`, error: info });
-        return info;
+        this.errorStream.next({ source: `after${what}`, error: error });
+        return error;
       }
 
       /**
@@ -562,7 +591,7 @@ export default (bottle) => {
 
             case S_ERROR:
               console.log('bad store:', this);
-              return Promise.reject(this.afterInitError('tried to initialize after error'));
+              // ßreturn Promise.reject(this.afterInitError('tried to initialize after error'));
               break;
 
             case S_STOPPED:
@@ -665,8 +694,8 @@ export default (bottle) => {
           setter = `set${capFirst(name)}`;
         }
 
-        if (!this.do[setter]) {
-          this.do[setter] = this.makeAction(setter, ({ state }, value) => {
+        if (!this._actions[setter]) {
+          this.addAction(setter, ({ state }, value) => {
             const out = { ...state };
             out[name] = value;
             return out;

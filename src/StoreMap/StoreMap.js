@@ -5,19 +5,20 @@ import clone from 'lodash.clonedeep';
 import { BehaviorSubject } from 'rxjs';
 
 export default (bottle) => {
-  bottle.factory('defaultStateReducer', ({ NOT_SET }) =>
-    /**
-     * Returns an object with states sub-indexed by the store name keys in the map.
-     * For convenience each store (that can be) is also key-value-dumped into the root
-     * but as this has the potential for shadowed values, the name-indexed states are the
-     * best source of truth.
-     *
-     * @param storeMap {Map} a dictionary of string/Store listings
-     */
+  /**
+   * Returns an object with states sub-indexed by the store name keys in the map.
+   * For convenience each store (that can be) is also key-value-dumped into the root
+   * but as this has the potential for shadowed values, the name-indexed states are the
+   * best source of truth.
+   *
+   * @param storeMap {Map} a dictionary of string/Store listings
+   */ bottle.factory('defaultStateReducer', ({ NOT_SET }) => () =>
     (storeMap) => {
       const byName = {};
       let out = {};
+      console.log('defaultStateReducer reducing ', storeMap);
       Array.from(storeMap.keys()).forEach((storeName) => {
+        console.log('defaultStateReducer: storeName = ', storeName);
         const state = storeMap.get(storeName).state;
         byName[storeName] = state;
 
@@ -26,6 +27,7 @@ export default (bottle) => {
         }
       });
 
+      console.log('defaultStateReducer returning MERGED:', out, 'SEGREGATED:', byName);
       return { ...out, ...byName };
     });
 
@@ -33,15 +35,27 @@ export default (bottle) => {
   bottle.factory('defaultActionReducer', () => (storeMap) => {
     let out = {};
 
-    storeMap.keys().forEach((key) => {
+    if (!(storeMap instanceof Map)) {
+      console.log('dar: non map passed:', storeMap);
+      return {};
+    }
+
+    // dump all the actions into the root object.
+    // warning: potential for shadowing.
+
+    Array.from(storeMap.keys()).forEach((key) => {
       const store = storeMap.get(key);
       out = { ...out, ...store.actions };
     });
 
-    storeMap.keys().forEach((key) => {
+    // segregate all the actions into a subset based on name
+
+    Array.from(storeMap.keys()).forEach((key) => {
       const store = storeMap.get(key);
       out[key] = store.actions;
     });
+
+    return out;
   });
 
 
@@ -50,8 +64,8 @@ export default (bottle) => {
    * but the output of defaultStarterFactory's bottle is a function that takes in a storeMap
    * and returns a starter function that calls each storeMap's starters.
    */
-  bottle.factory('defaultStarterFactory', () => storeMap => () => {
-    storeMap.values().forEach((store) => {
+  bottle.factory('defaultStarterFactory', ({ asMap }) => storeMap => () => {
+    Array.from(asMap(storeMap).values()).forEach((store) => {
       store.start();
     });
   });
@@ -71,33 +85,23 @@ export default (bottle) => {
     NOT_SET,
     ChangePromise,
     isPromise,
+    asMap,
     defaultStateReducer,
     defaultStarterFactory,
     defaultActionReducer,
     Store,
   }) => class StoreMap extends Store {
     constructor(storeMap = new Map(), config = {}) {
-      /**
-       * if the storeMap is a POJO, convert it to a formal Map object.
-       */
-      if (!(storeMap instanceof Map) && (typeof storeMap === 'object')) {
-        if (Array.isArray(storeMap)) storeMap = new Map(storeMap);
-        else {
-          const map = new StoreMap();
-          Object.keys(storeMap).forEach(name => map.set(name, storeMap[name]));
-          storeMap = map;
-        }
-      }
-
       const stateReducer = config._stateReducer || defaultStateReducer;
       const actionReducer = config._actionReducer || defaultActionReducer;
       const starterFactory = config.starter || defaultStarterFactory;
+      const trueMapStoreMap = asMap(storeMap);
 
-      super({ ...config, state: stateReducer(storeMap), starter: starterFactory(storeMap) });
+      const starter = starterFactory(trueMapStoreMap);
 
-      console.log('StoreMap:', StoreMap);
+      super({ ...config, state: stateReducer(trueMapStoreMap), starter });
+      this.stores = trueMapStoreMap;
 
-      this.stores = storeMap;
       this._stateReducer = stateReducer;
       this._actionReducer = actionReducer;
 
@@ -108,7 +112,7 @@ export default (bottle) => {
     }
 
     get do() {
-      return this._actionReducer(this.stores);
+      return this.actions;
     }
 
     get actions() {

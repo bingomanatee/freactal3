@@ -65,7 +65,7 @@ describe('looking-glass-engine', () => {
         const myStoreMap = new StoreMap({
           userStore, cartStore,
         });
-        expect(myStoreMap.state).toEqual(S_STARTED);
+        expect(myStoreMap.status).toEqual(S_STARTED);
       } catch (err) {
         console.log('error --- ', err);
       }
