@@ -14,6 +14,7 @@ describe('looking-glass-engine', () => {
     let S_NEW;
     let S_STARTED;
     let S_STARTING;
+    let S_ERROR;
     let myStore;
     let log;
 
@@ -23,6 +24,7 @@ describe('looking-glass-engine', () => {
       S_NEW = bottle.container.S_NEW;
       S_STARTED = bottle.container.S_STARTED;
       S_STARTING = bottle.container.S_STARTING;
+      S_ERROR = bottle.container.S_ERROR;
     });
 
     describe('initialization', () => {
@@ -186,6 +188,41 @@ describe('looking-glass-engine', () => {
           it('should have a status of S_STARTED', () => {
             myStore.start();
             expect(myStore.status).toEqual(S_STARTED);
+          });
+        });
+
+        describe('starter(sync) and state -- error on starter', () => {
+          /**
+           * without either a state or initializer, the state is as initialized
+           * as it ever will be -- to an unset symbol flag.
+           */
+
+          beforeEach(() => {
+            log = [];
+            myStore = new Store({
+              starter: () => {
+                throw new Error('I have an error');
+              },
+              state: -1,
+              debug: true,
+            });
+            myStore.debugStream.subscribe(m => log.push(m));
+          });
+
+          it('should have a state of -1', () => {
+            expect.assertions(1);
+            myStore.start()
+              .catch(() => {
+                expect(myStore.state).toEqual(-1);
+              });
+          });
+
+          it('should have a status of S_ERROR', () => {
+            expect.assertions(1);
+            myStore.start()
+              .catch(() => {
+                expect(myStore.status).toEqual(S_ERROR);
+              });
           });
         });
 
@@ -362,6 +399,26 @@ describe('looking-glass-engine', () => {
             await myStore.do.waterfall();
             expect(myStore.state.a).toEqual(4);
           });
+        });
+      });
+
+      describe('noop do', () => {
+        beforeEach(() => {
+          /**
+           * this action changes a through sub-actions.
+           * it has a return value that for whatever reason we do NOT
+           * want put into state. Because of this we speciically mark it as noop.
+           */
+          myStore.addAction('doubleA', ({ state, actions }) => {
+            const { a } = state;
+            actions.setA(2 * a);
+            return 100;
+          }, { noop: true });
+        });
+
+        it('suppresses action return value', () => {
+          myStore.do.doubleA();
+          expect(myStore.state).toEqual({ a: 2, b: [] });
         });
       });
     });

@@ -1,5 +1,6 @@
 import { from, race } from 'rxjs';
 import { delay } from 'rxjs/operators';
+import nameRegex from './nameRegex';
 
 export default (bottle) => {
   /**
@@ -78,10 +79,9 @@ export default (bottle) => {
         map.set(key, value);
         return map;
       }, new Map());
-    } else {
-      console.log('asMap cannot process ', item);
-      return new Map();
     }
+    console.log('asMap cannot process ', item);
+    return new Map();
   });
 
   bottle.factory('asValue', ({ NOT_SET }) => (value, defaultValue = null) => {
@@ -90,6 +90,29 @@ export default (bottle) => {
   });
 
   bottle.constant('NOOP', a => a);
+
+  /**
+   * This detects some specific falsines conditions.
+   */
+  bottle.factory('isSet', ({ NOT_SET }) => (value) => {
+    if (value === NOT_SET) return false;
+    if (typeof value === 'undefined') return false;
+    if (value === null) return false;
+    return true;
+  });
+
+  bottle.factory('isObject', ({ isSet }) => (value) => {
+    if (!isSet(value)) return false;
+    return typeof value === 'object';
+  });
+
+  bottle.factory('isFnName', () => (str) => {
+    if (!str) return false;
+    if (!(typeof str === 'string')) return false;
+    return nameRegex.test(str);
+  });
+
+  bottle.factory('isFunction', () => item => typeof item === 'function');
 
   bottle.factory('isPromise', () => (subject) => {
     if (!subject) return false;
