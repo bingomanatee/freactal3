@@ -94,15 +94,8 @@ export default (bottle) => {
    */
 
   bottle.factory('StoreMap', ({
-    STORE_STATE_UNSET_VALUE,
-    S_NEW,
-    S_STARTING,
-    S_ERROR,
     S_STOPPED,
-    S_STARTED,
     NOT_SET,
-    ChangePromise,
-    isPromise,
     asMap,
     defaultStateReducer,
     defaultStarter,

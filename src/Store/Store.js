@@ -67,38 +67,18 @@ export default (bottle) => {
 
         this.errorStream = new BehaviorSubject(false);
 
-        try {
-          if (debug) {
-            this.debugStream = new BehaviorSubject({
-              source: 'constructor',
-              config,
-            });
-          }
-        } catch (err) {
-          console.log('error setting up debug: ', err);
+        if (debug) {
+          this.debugStream = new BehaviorSubject({
+            source: 'constructor',
+            config,
+          });
         }
 
-        try {
-          this.addActions(actions);
-        } catch (err) {
-          console.log('error setting up actions', err);
-        }
-        try {
-          this._state = state;
-        } catch (err) {
-          console.log('error setting state', err);
-        }
-        try {
-          this._starter = asValue(starter);
-        } catch (err) {
-          console.log('error setting _starter:', err);
-        }
+        this.addActions(actions);
 
-        try {
-          this._status = asValue(this._starter) ? S_NEW : S_STARTED;
-        } catch (err) {
-          console.log('error setting _status');
-        }
+        this._state = state;
+        this._starter = asValue(starter);
+        this._status = asValue(this._starter) ? S_NEW : S_STARTED;
 
         this.stream = new BehaviorSubject({
           state: this.state,
